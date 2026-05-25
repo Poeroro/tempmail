@@ -18,7 +18,6 @@ Free temporary email service powered by Cloudflare stack.
 - **Backend:** Cloudflare Workers
 - **Storage:** Cloudflare KV
 - **Email:** Cloudflare Email Routing
-- **Domain:** `tempmeil.xyz`
 
 ## Setup
 
@@ -40,29 +39,33 @@ npm install
 npx wrangler kv namespace create MAIL_STORAGE
 ```
 
-Update `wrangler.toml` with the returned KV namespace ID.
+Update `wrangler.toml` with the returned KV namespace ID and your domain.
 
-### 3. Configure domain
+### 3. Update API endpoint
 
-Set nameservers at your registrar to:
+In `public/app.js`, replace `YOUR_WORKER_SUBDOMAIN` with your actual Workers subdomain:
+
+```js
+: "https://YOUR_WORKER_SUBDOMAIN.workers.dev";
 ```
-eugene.ns.cloudflare.com
-ximena.ns.cloudflare.com
-```
 
-### 4. Deploy Worker
+### 4. Configure domain
+
+Set nameservers at your registrar to your Cloudflare-assigned nameservers.
+
+### 5. Deploy Worker
 
 ```bash
 npx wrangler deploy
 ```
 
-### 5. Deploy Frontend
+### 6. Deploy Frontend
 
 ```bash
 npx wrangler pages deploy public/ --project-name=tempmail
 ```
 
-### 6. Setup Email Routing
+### 7. Setup Email Routing
 
 In Cloudflare Dashboard → Email Routing → Route to Worker `tempmail`.
 
@@ -76,7 +79,7 @@ tempmail/
 │   ├── index.html      # Frontend UI
 │   ├── app.js          # Client-side logic
 │   └── style.css       # Styles + animations
-├── wrangler.toml       # Cloudflare config
+├── wrangler.toml       # Cloudflare config (update with your values)
 └── package.json
 ```
 

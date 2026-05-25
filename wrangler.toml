@@ -3,8 +3,8 @@ main = "src/worker.js"
 compatibility_date = "2024-01-01"
 
 [vars]
-DOMAIN = "tempmeil.xyz"
+DOMAIN = "YOUR_DOMAIN.com"
 
 [[kv_namespaces]]
 binding = "MAIL_STORAGE"
-id = "19e6ad388a0f44759fa6403f7021821f"
+id = "YOUR_KV_NAMESPACE_ID"
