@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <defs>
+    <linearGradient id="envelopeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1"/>
+      <stop offset="100%" style="stop-color:#8b5cf6"/>
+    </linearGradient>
+    <linearGradient id="flapGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#818cf8"/>
+      <stop offset="100%" style="stop-color:#a78bfa"/>
+    </linearGradient>
+    <linearGradient id="clockGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#22d3ee"/>
+      <stop offset="100%" style="stop-color:#06b6d4"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#6366f1" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="100" cy="100" r="90" fill="#0f172a" opacity="0.5"/>
+  
+  <!-- Envelope body -->
+  <rect x="40" y="70" width="120" height="85" rx="12" fill="url(#envelopeGrad)" filter="url(#shadow)"/>
+  
+  <!-- Envelope flap (open) -->
+  <path d="M40 82 L100 120 L160 82 L160 70 C160 63.4 154.6 58 148 58 L52 58 C45.4 58 40 63.4 40 70 Z" fill="url(#flapGrad)" opacity="0.9"/>
+  
+  <!-- Envelope fold lines -->
+  <path d="M40 155 L85 115" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+  <path d="M160 155 L115 115" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+  
+  <!-- Clock circle (temp indicator) -->
+  <circle cx="145" cy="140" r="28" fill="#0f172a" stroke="url(#clockGrad)" stroke-width="3"/>
+  <circle cx="145" cy="140" r="22" fill="#0f172a"/>
+  
+  <!-- Clock hands -->
+  <line x1="145" y1="140" x2="145" y2="126" stroke="#22d3ee" stroke-width="3" stroke-linecap="round"/>
+  <line x1="145" y1="140" x2="155" y2="135" stroke="#22d3ee" stroke-width="2.5" stroke-linecap="round"/>
+  
+  <!-- Clock center dot -->
+  <circle cx="145" cy="140" r="3" fill="#22d3ee"/>
+  
+  <!-- Lightning bolt (speed indicator) -->
+  <path d="M55 130 L65 115 L70 122 L80 105" stroke="#fbbf24" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  
+  <!-- Sparkle dots -->
+  <circle cx="100" cy="45" r="3" fill="#e0e7ff" opacity="0.8"/>
+  <circle cx="120" cy="40" r="2" fill="#e0e7ff" opacity="0.6"/>
+  <circle cx="80" cy="42" r="2" fill="#e0e7ff" opacity="0.6"/>
+</svg>

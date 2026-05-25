@@ -25,16 +25,13 @@ themeToggle.addEventListener("click", () => {
 
 const API_BASE = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
   ? ""
-  : "https://YOUR_WORKER_SUBDOMAIN.workers.dev";
+  : "https://api.tempmeil.xyz";
 
-const EMAIL_TTL = 1800;
 const HISTORY_KEY = "tempmail_history";
 
 // ─── State ───
 let currentEmail = null;
-let expiresIn = 0;
 let refreshInterval = null;
-let timerInterval = null;
 let seenIds = new Set();
 
 // ─── DOM ───
@@ -49,8 +46,6 @@ const btnRestore = $("#btn-restore");
 const restoreInput = $("#restore-input");
 const historyList = $("#history-list");
 const emailAddress = $("#email-address");
-const timerProgress = $("#timer-progress");
-const timerText = $("#timer-text");
 const mailCount = $("#mail-count");
 const inboxList = $("#inbox-list");
 const emptyState = $("#empty-state");
@@ -62,18 +57,13 @@ const modalFrom = $("#modal-from");
 const modalTo = $("#modal-to");
 const modalDate = $("#modal-date");
 const modalBody = $("#modal-body");
+const toastEl = $("#toast");
 
 // ─── Toast ───
-function showToast(msg) {
-  let toast = document.querySelector(".toast");
-  if (!toast) {
-    toast = document.createElement("div");
-    toast.className = "toast";
-    document.body.appendChild(toast);
-  }
-  toast.textContent = msg;
-  toast.classList.add("show");
-  setTimeout(() => toast.classList.remove("show"), 2000);
+function showToast(msg, type = "") {
+  toastEl.textContent = msg;
+  toastEl.className = "toast show" + (type ? ` ${type}` : "");
+  setTimeout(() => toastEl.classList.remove("show"), 2500);
 }
 
 // ─── History ───
@@ -94,22 +84,74 @@ function addToHistory(email) {
   renderHistory();
 }
 
+function removeFromHistory(email) {
+  let history = getHistory();
+  history = history.filter(h => h.email !== email);
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  renderHistory();
+}
+
 function renderHistory() {
   const history = getHistory();
   if (history.length === 0) {
     historyList.innerHTML = "";
     return;
   }
-  historyList.innerHTML = `
-    <div class="history-label">Recent emails:</div>
-    ${history.map(h => `<button class="history-chip" data-email="${escapeHtml(h.email)}">${escapeHtml(h.email)}</button>`).join("")}
-  `;
-  historyList.querySelectorAll(".history-chip").forEach(chip => {
-    chip.addEventListener("click", () => {
-      restoreInput.value = chip.dataset.email;
+  historyList.innerHTML = history.map(h => `
+    <div class="history-item" data-email="${escapeHtml(h.email)}">
+      <span class="history-email">${escapeHtml(h.email)}</span>
+      <button class="history-delete" data-email="${escapeHtml(h.email)}" title="Remove">&times;</button>
+    </div>
+  `).join("");
+  historyList.querySelectorAll(".history-item").forEach(item => {
+    item.addEventListener("click", (e) => {
+      if (e.target.classList.contains("history-delete")) return;
+      restoreInput.value = item.dataset.email;
       restoreEmail();
     });
   });
+  historyList.querySelectorAll(".history-delete").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      removeFromHistory(btn.dataset.email);
+    });
+  });
+}
+
+// ─── Helpers ───
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.appendChild(document.createTextNode(str || ""));
+  return div.innerHTML;
+}
+
+function formatTimeAgo(ts) {
+  if (!ts) return "";
+  const diff = Math.floor((Date.now() - ts) / 1000);
+  if (diff < 60) return "just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return new Date(ts).toLocaleDateString();
+}
+
+function getInitial(email) {
+  if (!email) return "?";
+  const name = email.split("@")[0];
+  return name.charAt(0).toUpperCase();
+}
+
+function getAvatarColor(email) {
+  const colors = [
+    "#6366f1", "#8b5cf6", "#a855f7", "#d946ef",
+    "#ec4899", "#f43f5e", "#ef4444", "#f97316",
+    "#eab308", "#22c55e", "#14b8a6", "#06b6d4",
+    "#3b82f6"
+  ];
+  let hash = 0;
+  for (let i = 0; i < email.length; i++) {
+    hash = email.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colors[Math.abs(hash) % colors.length];
 }
 
 // ─── API ───
@@ -145,16 +187,17 @@ async function apiReadMail(email, messageId) {
 
 // ─── Generate ───
 async function generateEmail() {
-  btnGenerate.innerHTML = '<span class="spinner"></span> Generating...';
+  const originalHTML = btnGenerate.innerHTML;
+  btnGenerate.innerHTML = '<span class="loading"></span> Generating...';
   btnGenerate.disabled = true;
   try {
     const data = await apiGenerate();
-    activateInbox(data.email, data.expiresIn);
-    showToast(`Generated: ${data.username || data.email}`);
+    activateInbox(data.email);
+    showToast(`Generated: ${data.username || data.email}`, "success");
   } catch (err) {
-    showToast("Error: " + err.message);
+    showToast("Error: " + err.message, "error");
   } finally {
-    btnGenerate.innerHTML = '<span class="btn-icon">⚡</span> Generate New Email';
+    btnGenerate.innerHTML = originalHTML;
     btnGenerate.disabled = false;
   }
 }
@@ -163,40 +206,39 @@ async function generateEmail() {
 async function restoreEmail() {
   const email = restoreInput.value.trim().toLowerCase();
   if (!email || !email.includes("@")) {
-    showToast("Enter a valid email address");
+    showToast("Enter a valid email address", "error");
     return;
   }
-  btnRestore.innerHTML = '<span class="spinner"></span>';
+  const originalHTML = btnRestore.innerHTML;
+  btnRestore.innerHTML = '<span class="loading"></span>';
   btnRestore.disabled = true;
   try {
     const data = await apiRestore(email);
-    activateInbox(data.email, data.expiresIn);
-    showToast("Email restored!");
+    activateInbox(data.email);
+    showToast("Email restored!", "success");
   } catch (err) {
-    showToast(err.message);
+    showToast(err.message, "error");
   } finally {
-    btnRestore.innerHTML = "🔄 Restore";
+    btnRestore.innerHTML = originalHTML;
     btnRestore.disabled = false;
   }
 }
 
 // ─── Activate Inbox ───
-function activateInbox(email, expiry) {
+function activateInbox(email) {
   currentEmail = email;
-  expiresIn = expiry || EMAIL_TTL;
   addToHistory(email);
   seenIds.clear();
   inboxList.innerHTML = "";
   inboxList.appendChild(emptyState);
   emptyState.classList.remove("hidden");
-  emptyState.querySelector("p").textContent = "Waiting for incoming emails...";
+  emptyState.querySelector(".empty-title").textContent = "Waiting for incoming emails...";
   emptyState.querySelector(".empty-hint").textContent = "Send an email to the address above";
   mailCount.textContent = "0 emails";
   emailAddress.textContent = currentEmail;
   generateSection.classList.add("hidden");
   inboxSection.classList.remove("hidden");
   startPolling();
-  startTimer();
   const url = new URL(window.location);
   url.searchParams.set("email", email);
   window.history.replaceState({}, "", url);
@@ -205,9 +247,7 @@ function activateInbox(email, expiry) {
 // ─── Back ───
 function goBack() {
   stopPolling();
-  stopTimer();
   currentEmail = null;
-  expiresIn = 0;
   seenIds.clear();
   inboxSection.classList.add("hidden");
   generateSection.classList.remove("hidden");
@@ -231,23 +271,28 @@ async function fetchInbox() {
   if (!currentEmail) return;
   try {
     const data = await apiInbox(currentEmail);
-    if (data.expiresIn > 0) expiresIn = data.expiresIn;
-
     const messages = data.messages || [];
     mailCount.textContent = `${messages.length} email${messages.length !== 1 ? "s" : ""}`;
 
     if (messages.length === 0) {
       emptyState.classList.remove("hidden");
       if (data.refreshed) {
-        emptyState.querySelector("p").textContent = "Inbox refreshed — waiting for new emails...";
+        emptyState.querySelector(".empty-title").textContent = "Inbox refreshed — waiting for new emails...";
       } else if (data.notFound) {
-        emptyState.querySelector("p").textContent = "Address not found";
+        emptyState.querySelector(".empty-title").textContent = "Address not found";
         emptyState.querySelector(".empty-hint").textContent = "Generate a new email or restore one";
       }
       return;
     }
 
-    emptyState.classList.add("hidden");
+    // Remove expired cards and add new ones
+    const currentIds = new Set(messages.map(m => m.id));
+    inboxList.querySelectorAll('.email-card').forEach(card => {
+      if (!currentIds.has(card.dataset.id)) {
+        card.remove();
+        seenIds.delete(card.dataset.id);
+      }
+    });
     for (const msg of messages) {
       if (!seenIds.has(msg.id)) {
         seenIds.add(msg.id);
@@ -262,15 +307,22 @@ async function fetchInbox() {
 function addEmailCard(msg) {
   emptyState.classList.add("hidden");
   const card = document.createElement("div");
-  card.className = "email-card";
+  card.className = "email-card unread";
   card.dataset.id = msg.id;
+  
+  const fromName = msg.from ? msg.from.split("@")[0] : "unknown";
+  const avatarColor = getAvatarColor(msg.from || "");
+  
   card.innerHTML = `
-    <div class="email-card-top">
-      <span class="email-card-from">${escapeHtml(msg.from)}</span>
-      <span class="email-card-time">${formatTimeAgo(msg.timestamp)}</span>
+    <div class="email-avatar" style="background: linear-gradient(135deg, ${avatarColor}, ${avatarColor}dd)">
+      ${getInitial(msg.from)}
     </div>
-    <div class="email-card-subject">${escapeHtml(msg.subject)}</div>
-    <div class="email-card-snippet">${escapeHtml(msg.snippet)}</div>
+    <div class="email-info">
+      <div class="email-from">${escapeHtml(fromName)}</div>
+      <div class="email-subject">${escapeHtml(msg.subject)}</div>
+      <div class="email-snippet">${escapeHtml(msg.snippet)}</div>
+    </div>
+    <span class="email-time">${formatTimeAgo(msg.timestamp)}</span>
   `;
   card.addEventListener("click", () => openEmail(msg.id));
   inboxList.insertBefore(card, inboxList.firstChild);
@@ -285,26 +337,36 @@ async function openEmail(messageId) {
     modalTo.textContent = data.to || currentEmail;
     modalDate.textContent = new Date(data.timestamp).toLocaleString();
     if (data.htmlBody) {
-      modalBody.innerHTML = `<iframe sandbox="allow-same-origin" srcdoc="${escapeHtml(data.htmlBody)}"></iframe>`;
+      const blob = new Blob([data.htmlBody], { type: "text/html; charset=utf-8" });
+      const blobUrl = URL.createObjectURL(blob);
+      modalBody.innerHTML = `<iframe sandbox="allow-same-origin allow-scripts" src="${blobUrl}" style="width:100%;min-height:200px;border:none;background:#fff;border-radius:8px;"></iframe>`;
     } else {
-      modalBody.innerHTML = `<pre style="white-space:pre-wrap;font-family:inherit;">${escapeHtml(data.textBody || "(empty)")}</pre>`;
+      modalBody.innerHTML = `<pre style="white-space:pre-wrap;font-family:inherit;padding:8px 0;">${escapeHtml(data.textBody || "(empty)")}</pre>`;
     }
     emailModal.classList.remove("hidden");
+    // Mark as read
+    const card = inboxList.querySelector(`[data-id="${messageId}"]`);
+    if (card) card.classList.remove("unread");
   } catch (err) {
-    showToast("Error: " + err.message);
+    showToast("Error: " + err.message, "error");
   }
 }
 
 function closeModal() {
   emailModal.classList.add("hidden");
+  const iframe = modalBody.querySelector("iframe");
+  if (iframe && iframe.src.startsWith("blob:")) {
+    URL.revokeObjectURL(iframe.src);
+  }
   modalBody.innerHTML = "";
 }
 
+// ─── Copy Email ───
 async function copyEmail() {
   if (!currentEmail) return;
   try {
     await navigator.clipboard.writeText(currentEmail);
-    showToast("Copied!");
+    showToast("Copied!", "success");
   } catch {
     const ta = document.createElement("textarea");
     ta.value = currentEmail;
@@ -312,69 +374,35 @@ async function copyEmail() {
     ta.select();
     document.execCommand("copy");
     document.body.removeChild(ta);
-    showToast("Copied!");
+    showToast("Copied!", "success");
   }
 }
-
-// ─── Timer ───
-function startTimer() {
-  stopTimer();
-  updateTimer();
-  timerInterval = setInterval(updateTimer, 1000);
-}
-
-function stopTimer() {
-  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
-}
-
-function updateTimer() {
-  if (expiresIn <= 0) {
-    timerText.textContent = "Inbox expired — address still usable, restore for new 30min";
-    timerProgress.style.width = "0%";
-    timerProgress.style.background = "rgba(255,68,68,0.15)";
-    stopPolling();
-    stopTimer();
-    return;
-  }
-  expiresIn--;
-  const m = Math.floor(expiresIn / 60);
-  const s = expiresIn % 60;
-  timerText.textContent = `${m}:${s.toString().padStart(2, "0")} remaining`;
-  const pct = (expiresIn / EMAIL_TTL) * 100;
-  timerProgress.style.width = `${pct}%`;
-  timerProgress.style.background = pct < 20 ? "rgba(255,68,68,0.15)" : pct < 50 ? "rgba(255,170,0,0.1)" : "var(--accent-dim)";
-}
-
-// ─── Helpers ───
-function formatTimeAgo(ts) {
-  const d = Math.floor((Date.now() - ts) / 1000);
-  if (d < 10) return "just now";
-  if (d < 60) return `${d}s ago`;
-  if (d < 3600) return `${Math.floor(d / 60)}m ago`;
-  return `${Math.floor(d / 3600)}h ago`;
-}
-
-function escapeHtml(s) {
-  if (!s) return "";
-  const d = document.createElement("div");
-  d.textContent = s;
-  return d.innerHTML;
-}
-
-// ─── Events ───
-btnGenerate.addEventListener("click", generateEmail);
-btnCopy.addEventListener("click", copyEmail);
-btnNew.addEventListener("click", generateEmail);
-btnBack.addEventListener("click", goBack);
-btnRestore.addEventListener("click", restoreEmail);
-restoreInput.addEventListener("keydown", e => { if (e.key === "Enter") restoreEmail(); });
-modalClose.addEventListener("click", closeModal);
-modalOverlay.addEventListener("click", closeModal);
-document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
 
 // ─── Init ───
-renderHistory();
-const params = new URLSearchParams(window.location.search);
-if (params.get("email")) {
-  activateInbox(params.get("email"), EMAIL_TTL);
-}
+document.addEventListener("DOMContentLoaded", () => {
+  btnGenerate.addEventListener("click", generateEmail);
+  btnCopy.addEventListener("click", copyEmail);
+  btnNew.addEventListener("click", () => { goBack(); generateEmail(); });
+  btnBack.addEventListener("click", goBack);
+  btnRestore.addEventListener("click", restoreEmail);
+  modalClose.addEventListener("click", closeModal);
+  modalOverlay.addEventListener("click", closeModal);
+  restoreInput.addEventListener("keydown", (e) => { if (e.key === "Enter") restoreEmail(); });
+  
+  // Keyboard shortcuts
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !emailModal.classList.contains("hidden")) {
+      closeModal();
+    }
+  });
+  
+  renderHistory();
+
+  // Auto-restore from URL param
+  const params = new URLSearchParams(window.location.search);
+  const emailParam = params.get("email");
+  if (emailParam) {
+    restoreInput.value = emailParam;
+    restoreEmail();
+  }
+});

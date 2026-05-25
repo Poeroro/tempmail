@@ -1,95 +1,107 @@
-# TempMail — Disposable Email Service
+# TempMail
 
-Free temporary email service powered by Cloudflare stack.
+Disposable email service powered by Cloudflare Workers + Pages.
+
+**Live:** [mail.tempmeil.xyz](https://mail.tempmeil.xyz)
 
 ## Features
 
-- 🚀 Generate disposable email addresses from a pool of 1000 usernames
-- 📬 Real-time inbox with auto-polling
-- 🔄 Restore previous email addresses (addresses never expire)
-- ⏱️ Email content auto-deletes after 30 minutes
-- 📋 Copy to clipboard with one click
-- 🌙/☀️ Dark/Light mode with smooth animations
-- 📱 Fully responsive design
+- Generate random temp email addresses from a username pool
+- Receive emails in real-time (Cloudflare Email Routing)
+- Auto-delete emails after 30 minutes
+- Addresses persist for 1 year
+- Dark/light theme
+- Responsive mobile UI
+- Restore previous addresses from history
 
-## Stack
-
-- **Frontend:** Vanilla HTML/CSS/JS → Cloudflare Pages
-- **Backend:** Cloudflare Workers
-- **Storage:** Cloudflare KV
-- **Email:** Cloudflare Email Routing
-
-## Setup
-
-### Prerequisites
-
-- Node.js 18+
-- Cloudflare account (free tier works)
-- Domain added to Cloudflare
-
-### 1. Install dependencies
-
-```bash
-npm install
-```
-
-### 2. Create KV namespace
-
-```bash
-npx wrangler kv namespace create MAIL_STORAGE
-```
-
-Update `wrangler.toml` with the returned KV namespace ID and your domain.
-
-### 3. Update API endpoint
-
-In `public/app.js`, replace `YOUR_WORKER_SUBDOMAIN` with your actual Workers subdomain:
-
-```js
-: "https://YOUR_WORKER_SUBDOMAIN.workers.dev";
-```
-
-### 4. Configure domain
-
-Set nameservers at your registrar to your Cloudflare-assigned nameservers.
-
-### 5. Deploy Worker
-
-```bash
-npx wrangler deploy
-```
-
-### 6. Deploy Frontend
-
-```bash
-npx wrangler pages deploy public/ --project-name=tempmail
-```
-
-### 7. Setup Email Routing
-
-In Cloudflare Dashboard → Email Routing → Route to Worker `tempmail`.
-
-## Project Structure
+## Architecture
 
 ```
-tempmail/
-├── src/
-│   └── worker.js      # API + Email handler + Username pool
-├── public/
-│   ├── index.html      # Frontend UI
-│   ├── app.js          # Client-side logic
-│   └── style.css       # Styles + animations
-├── wrangler.toml       # Cloudflare config (update with your values)
-└── package.json
+┌─────────────────┐     ┌──────────────────────┐
+│  mail.tempmeil   │────▶│  Cloudflare Pages    │
+│  (frontend)      │     │  public/             │
+└─────────────────┘     └──────────────────────┘
+        │
+        ▼ API calls
+┌─────────────────┐     ┌──────────────────────┐
+│  api.tempmeil    │────▶│  Cloudflare Worker   │
+│  (backend)       │     │  src/worker.js       │
+└─────────────────┘     └──────────┬───────────┘
+                                   │
+                                   ▼
+                        ┌──────────────────────┐
+                        │  Cloudflare KV       │
+                        │  (MAIL_STORAGE)      │
+                        └──────────────────────┘
 ```
 
 ## API Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/generate` | Generate new temp email |
-| `GET` | `/api/inbox/:email` | Fetch inbox for address |
-| `POST` | `/api/restore` | Restore a previous email address |
+| GET | `/api/generate` | Generate new temp email |
+| POST | `/api/restore` | Restore existing address |
+| GET | `/api/check?email=` | Check if address exists |
+| GET | `/api/inbox/{email}` | List inbox messages |
+| GET | `/api/mail/{email}/{id}` | Read single email |
+
+## Project Structure
+
+```
+tempmail/
+├── src/
+│   ├── worker.js      # Worker API + email handler
+│   └── usernames.js   # Username pool (1001 names)
+├── public/
+│   ├── index.html     # Frontend HTML
+│   ├── app.js         # Frontend JS
+│   ├── style.css      # Styles (dark/light)
+│   └── logo.svg       # SVG logo
+├── wrangler.toml      # Wrangler config
+├── package.json
+└── README.md
+```
+
+## Setup
+
+### Prerequisites
+
+- Cloudflare account with Workers + Pages enabled
+- `wrangler` CLI installed
+- KV namespace created
+- Email Routing configured for `tempmeil.xyz`
+
+### Deploy
+
+```bash
+# Install deps
+npm install
+
+# Create KV namespace
+wrangler kv:namespace create MAIL_STORAGE
+
+# Update wrangler.toml with your KV namespace ID
+
+# Deploy Worker
+wrangler deploy
+
+# Deploy Pages frontend
+wrangler pages deploy public --project-name=tempmail --branch=main
+```
+
+### DNS Setup
+
+| Type | Name | Content | Proxied |
+|------|------|---------|---------|
+| CNAME | mail | tempmail-5au.pages.dev | ✅ |
+| AAAA | api | 100:: | ✅ |
+
+Worker route: `api.tempmeil.xyz/*` → `tempmail`
+
+### Email Routing
+
+In Cloudflare Dashboard → Email Routing:
+- Catch-all action: **Send to Worker** → `tempmail`
 
 ## License
 
