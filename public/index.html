@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TempMail — Disposable Email</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📧</text></svg>">
+</head>
+<body>
+  <!-- Theme Toggle -->
+  <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
+    <div class="theme-toggle-thumb">
+      <span class="theme-toggle-icon dark-icon">🌙</span>
+      <span class="theme-toggle-icon light-icon">☀️</span>
+    </div>
+  </button>
+
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="logo">
+        <span class="logo-icon">📧</span>
+        <h1>TempMail</h1>
+      </div>
+      <p class="tagline">Disposable email — no signup, no tracking</p>
+    </header>
+
+    <!-- Generate Section -->
+    <section id="generate-section" class="section">
+      <div class="generate-card">
+        <p class="generate-hint">Click below to get a temporary email address</p>
+        <button id="btn-generate" class="btn btn-primary">
+          <span class="btn-icon">⚡</span>
+          Generate New Email
+        </button>
+      </div>
+
+      <!-- Restore Previous Email -->
+      <div class="restore-card">
+        <p class="restore-hint">Have a previous email? Restore it here</p>
+        <div class="restore-form">
+          <input
+            type="text"
+            id="restore-input"
+            class="restore-input"
+            placeholder="e.g. aceh.aldi900@tempmeil.xyz"
+            spellcheck="false"
+            autocomplete="off"
+          >
+          <button id="btn-restore" class="btn btn-small">
+            🔄 Restore
+          </button>
+        </div>
+        <div id="history-list" class="history-list"></div>
+      </div>
+    </section>
+
+    <!-- Inbox Section (hidden initially) -->
+    <section id="inbox-section" class="section hidden">
+      <div class="email-bar">
+        <button id="btn-back" class="btn btn-small btn-outline" title="Back to home">
+          ← Back
+        </button>
+        <div class="email-display">
+          <span class="email-label">Your temp email:</span>
+          <span id="email-address" class="email-value"></span>
+        </div>
+        <div class="email-actions">
+          <button id="btn-copy" class="btn btn-small" title="Copy to clipboard">
+            📋 Copy
+          </button>
+          <button id="btn-new" class="btn btn-small btn-outline" title="Generate new email">
+            🔄 New
+          </button>
+        </div>
+      </div>
+
+      <!-- Timer -->
+      <div class="timer-bar">
+        <div class="timer-progress" id="timer-progress"></div>
+        <span id="timer-text" class="timer-text">30:00 remaining</span>
+      </div>
+
+      <!-- Inbox -->
+      <div class="inbox-header">
+        <h2>Inbox</h2>
+        <span id="mail-count" class="mail-count">0 emails</span>
+      </div>
+
+      <div id="inbox-list" class="inbox-list">
+        <div class="empty-state" id="empty-state">
+          <span class="empty-icon">📭</span>
+          <p>Waiting for incoming emails...</p>
+          <p class="empty-hint">Send an email to the address above</p>
+        </div>
+      </div>
+
+      <!-- Email Detail Modal -->
+      <div id="email-modal" class="modal hidden">
+        <div class="modal-overlay" id="modal-overlay"></div>
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3 id="modal-subject"></h3>
+            <button id="modal-close" class="btn-close">&times;</button>
+          </div>
+          <div class="modal-meta">
+            <div><strong>From:</strong> <span id="modal-from"></span></div>
+            <div><strong>To:</strong> <span id="modal-to"></span></div>
+            <div><strong>Date:</strong> <span id="modal-date"></span></div>
+          </div>
+          <div class="modal-body" id="modal-body"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+      <p>Emails auto-delete after 30 minutes &bull; Addresses never expire</p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

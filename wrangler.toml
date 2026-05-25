@@ -1,0 +1,10 @@
+name = "tempmail"
+main = "src/worker.js"
+compatibility_date = "2024-01-01"
+
+[vars]
+DOMAIN = "tempmeil.xyz"
+
+[[kv_namespaces]]
+binding = "MAIL_STORAGE"
+id = "19e6ad388a0f44759fa6403f7021821f"
