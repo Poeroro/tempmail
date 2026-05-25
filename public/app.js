@@ -23,9 +23,14 @@ themeToggle.addEventListener("click", () => {
   applyTheme(current === "dark" ? "light" : "dark");
 });
 
-const API_BASE = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
-  ? ""
-  : `https://api.${window.location.hostname.replace("mail.", "")}`;
+const API_BASE = (() => {
+  const h = window.location.hostname;
+  if (h === "localhost" || h === "127.0.0.1") return "";
+  // mail.X.Y → api.X.Y
+  const parts = h.split(".");
+  if (parts[0] === "mail") parts[0] = "api";
+  return `https://${parts.join(".")}`;
+})();
 
 const HISTORY_KEY = "tempmail_history";
 
@@ -156,7 +161,7 @@ function getAvatarColor(email) {
 
 // ─── API ───
 async function apiGenerate() {
-  const res = await fetch(`${API_BASE}/api/generate`);
+  const res = await fetch(`${API_BASE}/api/generate`, { method: "POST" });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Failed to generate");
   return data;
@@ -336,6 +341,8 @@ async function openEmail(messageId) {
     modalFrom.textContent = data.from || "unknown";
     modalTo.textContent = data.to || currentEmail;
     modalDate.textContent = new Date(data.timestamp).toLocaleString();
+    // Close previous modal content to revoke old blob URLs
+    closeModal();
     if (data.htmlBody) {
       const blob = new Blob([data.htmlBody], { type: "text/html; charset=utf-8" });
       const blobUrl = URL.createObjectURL(blob);
@@ -344,8 +351,8 @@ async function openEmail(messageId) {
       modalBody.innerHTML = `<pre style="white-space:pre-wrap;font-family:inherit;padding:8px 0;">${escapeHtml(data.textBody || "(empty)")}</pre>`;
     }
     emailModal.classList.remove("hidden");
-    // Mark as read
-    const card = inboxList.querySelector(`[data-id="${messageId}"]`);
+    // Mark as read — use CSS.escape for safe selector
+    const card = inboxList.querySelector(`[data-id="${CSS.escape(messageId)}"]`);
     if (card) card.classList.remove("unread");
   } catch (err) {
     showToast("Error: " + err.message, "error");

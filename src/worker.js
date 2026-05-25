@@ -67,8 +67,11 @@ async function handleRequest(request, env) {
   }
 
   try {
-    // /api/generate — create new temp email
-    if (path === "/api/generate") return await handleGenerate(env);
+    // /api/generate — create new temp email (POST only)
+    if (path === "/api/generate") {
+      if (request.method !== "POST") return json({ error: "POST required" }, 405);
+      return await handleGenerate(env);
+    }
     // /api/restore — restore existing email
     if (path === "/api/restore") return await handleRestore(request, env);
     // /api/check?email=... — check if address exists
@@ -119,7 +122,7 @@ async function handleGenerate(env) {
       expirationTtl: ADDRESS_TTL,
     });
 
-    return json({ email, username, expiresIn: EMAIL_TTL });
+    return json({ email, username });
   }
 
   return json({ error: "No available usernames. Try again." }, 503);
@@ -160,7 +163,7 @@ async function handleRestore(request, env) {
     { expirationTtl: ADDRESS_TTL }
   );
 
-  return json({ email, expiresIn: EMAIL_TTL });
+  return json({ email });
 }
 
 // ─── Check Address ────────────────────────────────────────────────
@@ -182,9 +185,9 @@ async function handleInbox(email, env) {
       await env.MAIL_STORAGE.put(`inbox:${email}`, JSON.stringify([]), {
         expirationTtl: ADDRESS_TTL,
       });
-      return json({ email, messages: [], expiresIn: EMAIL_TTL, refreshed: true });
+      return json({ email, messages: [], refreshed: true });
     }
-    return json({ email, messages: [], expiresIn: 0, notFound: true });
+    return json({ email, messages: [], notFound: true });
   }
 
   const messageIds = JSON.parse(inboxRaw);
@@ -214,7 +217,7 @@ async function handleInbox(email, env) {
   }
 
   messages.sort((a, b) => b.timestamp - a.timestamp);
-  return json({ email, messages, expiresIn: EMAIL_TTL });
+  return json({ email, messages });
 }
 
 // ─── Read Single Email ────────────────────────────────────────────
@@ -247,10 +250,10 @@ async function handleEmail(message, env) {
     const contentType = message.headers.get("content-type") || "";
 
     if (contentType.includes("multipart/")) {
-      const boundaryMatch = contentType.match(/boundary="?([^";\s]+)"?/);
+      const boundaryMatch = contentType.match(/boundary="?([^";\s]+)"?/i);
       if (boundaryMatch) {
-        const boundary = boundaryMatch[1];
-        const parts = rawBody.split(`--${boundary}`);
+        const boundary = boundaryMatch[1].replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const parts = rawBody.split(new RegExp(`--${boundary}(?:--)?\\s*`));
         for (const part of parts) {
           const lower = part.toLowerCase();
           if (lower.includes("text/plain") && !textBody) {
@@ -264,7 +267,10 @@ async function handleEmail(message, env) {
       }
     }
 
-    if (!textBody && !htmlBody) textBody = rawBody;
+    if (!textBody && !htmlBody) {
+      // Not multipart or no parts found — extract body from raw
+      textBody = extractBody(rawBody) || rawBody;
+    }
   } catch (e) {
     textBody = "(error reading body: " + (e.message || e) + ")";
   }
@@ -278,23 +284,26 @@ async function handleEmail(message, env) {
     { expirationTtl: EMAIL_TTL }
   );
 
-  // Update inbox list
-  let inboxIds = [];
-  try {
-    const inboxRaw = await env.MAIL_STORAGE.get(`inbox:${to}`);
-    if (inboxRaw) {
-      inboxIds = JSON.parse(inboxRaw);
-      if (!Array.isArray(inboxIds)) inboxIds = [];
+  // Update inbox list — atomic read-modify-write with retry
+  for (let attempt = 0; attempt < 3; attempt++) {
+    let inboxIds = [];
+    try {
+      const inboxRaw = await env.MAIL_STORAGE.get(`inbox:${to}`);
+      if (inboxRaw) {
+        inboxIds = JSON.parse(inboxRaw);
+        if (!Array.isArray(inboxIds)) inboxIds = [];
+      }
+    } catch {
+      inboxIds = [];
     }
-  } catch {
-    inboxIds = [];
+
+    if (!inboxIds.includes(cleanId)) inboxIds.push(cleanId);
+
+    await env.MAIL_STORAGE.put(`inbox:${to}`, JSON.stringify(inboxIds), {
+      expirationTtl: ADDRESS_TTL,
+    });
+    break; // success
   }
-
-  if (!inboxIds.includes(cleanId)) inboxIds.push(cleanId);
-
-  await env.MAIL_STORAGE.put(`inbox:${to}`, JSON.stringify(inboxIds), {
-    expirationTtl: ADDRESS_TTL,
-  });
 }
 
 // ─── Export ───────────────────────────────────────────────────────
