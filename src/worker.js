@@ -233,6 +233,9 @@ async function handleReadMail(email, messageId, env) {
 async function handleEmail(message, env) {
   const to = message.to;
   const from = message.from;
+
+  // Validate required fields
+  if (!to || !from) return;
   const subject = decodeMimeHeader(message.headers.get("subject")) || "(no subject)";
   const messageId =
     message.headers.get("message-id") ||
@@ -254,7 +257,10 @@ async function handleEmail(message, env) {
       if (boundaryMatch) {
         const boundary = boundaryMatch[1].replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         const parts = rawBody.split(new RegExp(`--${boundary}(?:--)?\\s*`));
-        for (const part of parts) {
+        // Skip preamble (first part before first boundary)
+        for (let i = 1; i < parts.length; i++) {
+          const part = parts[i];
+          if (!part.trim()) continue; // skip empty parts
           const lower = part.toLowerCase();
           if (lower.includes("text/plain") && !textBody) {
             textBody = extractBody(part);
@@ -269,18 +275,27 @@ async function handleEmail(message, env) {
 
     if (!textBody && !htmlBody) {
       // Not multipart or no parts found — extract body from raw
-      textBody = extractBody(rawBody) || rawBody;
+      textBody = extractBody(rawBody);
+      if (!textBody) {
+        // Last resort: strip common MIME headers and return the rest
+        const headerEnd = rawBody.search(/\r?\n\r?\n/);
+        textBody = headerEnd !== -1 ? rawBody.substring(headerEnd).trim() : rawBody;
+      }
     }
   } catch (e) {
     textBody = "(error reading body: " + (e.message || e) + ")";
   }
 
-  const cleanId = messageId.replace(/[<>]/g, "").replace(/[^a-zA-Z0-9._@-]/g, "_");
+  const cleanId = messageId.replace(/[<>]/g, "").replace(/[^a-zA-Z0-9._@-]/g, "_").substring(0, 200);
+
+  // Deduplicate: if same Message-ID exists, append timestamp
+  const existingMail = await env.MAIL_STORAGE.get(`mail:${to}:${cleanId}`);
+  const finalId = existingMail ? `${cleanId}_${Date.now()}` : cleanId;
 
   // Store email
   await env.MAIL_STORAGE.put(
-    `mail:${to}:${cleanId}`,
-    JSON.stringify({ messageId: cleanId, from, to, subject, textBody, htmlBody, timestamp: Date.now() }),
+    `mail:${to}:${finalId}`,
+    JSON.stringify({ messageId: finalId, from, to, subject, textBody, htmlBody, timestamp: Date.now() }),
     { expirationTtl: EMAIL_TTL }
   );
 
@@ -297,7 +312,7 @@ async function handleEmail(message, env) {
       inboxIds = [];
     }
 
-    if (!inboxIds.includes(cleanId)) inboxIds.push(cleanId);
+    if (!inboxIds.includes(finalId)) inboxIds.push(finalId);
 
     await env.MAIL_STORAGE.put(`inbox:${to}`, JSON.stringify(inboxIds), {
       expirationTtl: ADDRESS_TTL,

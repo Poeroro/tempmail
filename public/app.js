@@ -125,9 +125,7 @@ function renderHistory() {
 
 // ─── Helpers ───
 function escapeHtml(str) {
-  const div = document.createElement("div");
-  div.appendChild(document.createTextNode(str || ""));
-  return div.innerHTML;
+  return (str || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 function formatTimeAgo(ts) {
@@ -306,6 +304,7 @@ async function fetchInbox() {
     }
   } catch (err) {
     console.error("Inbox error:", err);
+    showToast("Connection error — retrying...", "error");
   }
 }
 
@@ -335,14 +334,18 @@ function addEmailCard(msg) {
 
 async function openEmail(messageId) {
   if (!currentEmail) return;
+  // Loading state
+  const card = inboxList.querySelector(`[data-id="${CSS.escape(messageId)}"]`);
+  const prevCursor = card ? card.style.cursor : "";
+  if (card) { card.style.cursor = "wait"; card.style.opacity = "0.6"; }
   try {
     const data = await apiReadMail(currentEmail, messageId);
     modalSubject.textContent = data.subject || "(no subject)";
     modalFrom.textContent = data.from || "unknown";
     modalTo.textContent = data.to || currentEmail;
     modalDate.textContent = new Date(data.timestamp).toLocaleString();
-    // Close previous modal content to revoke old blob URLs
-    closeModal();
+    // Revoke old blob without hiding modal
+    revokeOldBlob();
     if (data.htmlBody) {
       const blob = new Blob([data.htmlBody], { type: "text/html; charset=utf-8" });
       const blobUrl = URL.createObjectURL(blob);
@@ -351,21 +354,26 @@ async function openEmail(messageId) {
       modalBody.innerHTML = `<pre style="white-space:pre-wrap;font-family:inherit;padding:8px 0;">${escapeHtml(data.textBody || "(empty)")}</pre>`;
     }
     emailModal.classList.remove("hidden");
-    // Mark as read — use CSS.escape for safe selector
-    const card = inboxList.querySelector(`[data-id="${CSS.escape(messageId)}"]`);
+    // Mark as read
     if (card) card.classList.remove("unread");
   } catch (err) {
     showToast("Error: " + err.message, "error");
+  } finally {
+    if (card) { card.style.cursor = prevCursor; card.style.opacity = ""; }
   }
 }
 
-function closeModal() {
-  emailModal.classList.add("hidden");
+function revokeOldBlob() {
   const iframe = modalBody.querySelector("iframe");
   if (iframe && iframe.src.startsWith("blob:")) {
     URL.revokeObjectURL(iframe.src);
   }
   modalBody.innerHTML = "";
+}
+
+function closeModal() {
+  emailModal.classList.add("hidden");
+  revokeOldBlob();
 }
 
 // ─── Copy Email ───
