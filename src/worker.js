@@ -99,7 +99,7 @@ async function handleRequest(request, env) {
 // ─── Generate Email ───────────────────────────────────────────────
 
 async function handleGenerate(env) {
-  const domain = env.DOMAIN || "tempmeil.xyz";
+  const domain = env.DOMAIN || "example.com";
 
   for (let attempt = 0; attempt < 30; attempt++) {
     const idx = Math.floor(Math.random() * USERNAME_POOL.length);

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Deploy tempmail Worker (fetch + email handlers)
-cd /home/ubuntu/tempmail
+cd "$(dirname "$0")"
 
 # Deploy Worker
 echo "Deploying Worker..."

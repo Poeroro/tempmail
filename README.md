@@ -2,8 +2,6 @@
 
 Disposable email service powered by Cloudflare Workers + Pages.
 
-**Live:** [mail.tempmeil.xyz](https://mail.tempmeil.xyz)
-
 ## Features
 
 - Generate random temp email addresses from a username pool
@@ -18,13 +16,13 @@ Disposable email service powered by Cloudflare Workers + Pages.
 
 ```
 ┌─────────────────┐     ┌──────────────────────┐
-│  mail.tempmeil   │────▶│  Cloudflare Pages    │
+│  mail.yourdomain │────▶│  Cloudflare Pages    │
 │  (frontend)      │     │  public/             │
 └─────────────────┘     └──────────────────────┘
         │
         ▼ API calls
 ┌─────────────────┐     ┌──────────────────────┐
-│  api.tempmeil    │────▶│  Cloudflare Worker   │
+│  api.yourdomain  │────▶│  Cloudflare Worker   │
 │  (backend)       │     │  src/worker.js       │
 └─────────────────┘     └──────────┬───────────┘
                                    │
@@ -69,7 +67,7 @@ tempmail/
 - Cloudflare account with Workers + Pages enabled
 - `wrangler` CLI installed
 - KV namespace created
-- Email Routing configured for `tempmeil.xyz`
+- Email Routing configured for your domain
 
 ### Deploy
 
@@ -80,7 +78,7 @@ npm install
 # Create KV namespace
 wrangler kv:namespace create MAIL_STORAGE
 
-# Update wrangler.toml with your KV namespace ID
+# Update wrangler.toml with your KV namespace ID and domain
 
 # Deploy Worker
 wrangler deploy
@@ -93,10 +91,10 @@ wrangler pages deploy public --project-name=tempmail --branch=main
 
 | Type | Name | Content | Proxied |
 |------|------|---------|---------|
-| CNAME | mail | tempmail-5au.pages.dev | ✅ |
+| CNAME | mail | your-pages-url.pages.dev | ✅ |
 | AAAA | api | 100:: | ✅ |
 
-Worker route: `api.tempmeil.xyz/*` → `tempmail`
+Worker route: `api.yourdomain/*` → `tempmail`
 
 ### Email Routing
 

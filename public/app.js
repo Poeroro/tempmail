@@ -25,7 +25,7 @@ themeToggle.addEventListener("click", () => {
 
 const API_BASE = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
   ? ""
-  : "https://api.tempmeil.xyz";
+  : `https://api.${window.location.hostname.replace("mail.", "")}`;
 
 const HISTORY_KEY = "tempmail_history";
 
